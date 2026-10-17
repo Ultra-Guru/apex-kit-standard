@@ -58,7 +58,7 @@ internal object KitLlmResilience {
      */
     suspend fun run(
         emit: suspend (KitEvent) -> Unit,
-        retrySleeper: RetrySleeper = { delay(it) },
+        retrySleeper: suspend (Long) -> Unit = { delay(it) },
         classifier: KitLlmErrorClassifier = KitLlmErrorClassifier.Default,
         hasPartialOutput: () -> Boolean,
         attempt: suspend (textOnly: Boolean) -> String?

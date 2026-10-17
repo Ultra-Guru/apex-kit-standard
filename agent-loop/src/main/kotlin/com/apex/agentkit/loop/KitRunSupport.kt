@@ -126,6 +126,3 @@ internal class ToolOutputTruncator(
         private const val MIN_KEEP_CHARS = 256
     }
 }
-
-/** LLM 阶梯延迟执行器类型（测试注入记录器；生产真实 [delay]）。 */
-internal typealias RetrySleeper = suspend (Long) -> Unit
