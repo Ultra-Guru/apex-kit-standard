@@ -1,0 +1,111 @@
+name: Release
+
+# ═════════════════════════════════════════════════════════════════════════════
+# apex-standard-kit 发布流水线（tag 触发）：
+#   v* tag → 构建 + 单测 + publishToMavenLocal → 产物（jar / sources / POM）
+#   附到 GitHub Release（发布说明自动取 tag 间的提交清单）。
+#
+#   坐标：com.apex.standardkit:standard-loop（POM/SCM 已配置）。
+#   Maven Central 直发未配置 —— 产物随 Release 分发，宿主按 lock 检出或
+#   mavenLocal 消费；后续接入 Central 凭据只需扩展本流水线。
+# ═════════════════════════════════════════════════════════════════════════════
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（已存在）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "准备发布: ${TAG}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build & test & publish to mavenLocal
+        run: |
+          ./gradlew :standard-loop:test publishToMavenLocal --no-daemon --stacktrace
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          VER=$(grep -m1 '^version = "' standard-loop/build.gradle.kts | sed 's/version = "//;s/"//')
+          TAG="${{ steps.tag.outputs.tag }}"
+          if [ "${TAG#v}" != "${VER}" ]; then
+            echo "❌ tag(${TAG}) 与模块版本(${VER}) 不一致 —— 发布口径要求 tag=v{version}"
+            exit 1
+          fi
+          mkdir -p build/release
+          cp ~/.m2/repository/com/apex/standardkit/standard-loop/${VER}/standard-loop-${VER}.jar \
+             build/release/
+          cp ~/.m2/repository/com/apex/standardkit/standard-loop/${VER}/standard-loop-${VER}-sources.jar \
+             build/release/ || true
+          cp ~/.m2/repository/com/apex/standardkit/standard-loop/${VER}/standard-loop-${VER}.pom \
+             build/release/
+          ls -la build/release/
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1 || true)
+          RANGE="${PREV_TAG}..${TAG}"
+          echo "range=${RANGE}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## ${TAG}"
+            echo
+            echo "坐标: \`com.apex.standardkit:standard-loop:${TAG#v}\`"
+            echo
+            echo "### 提交清单"
+            echo
+            git log --oneline "${RANGE}" 2>/dev/null | sed 's/^/- /' || echo "- （首个 tag：全量历史）"
+          } > build/release/notes.md
+          cat build/release/notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" \
+            --title "apex-standard-kit ${TAG}" \
+            --notes-file build/release/notes.md \
+            build/release/standard-loop-*.jar build/release/standard-loop-*.pom
