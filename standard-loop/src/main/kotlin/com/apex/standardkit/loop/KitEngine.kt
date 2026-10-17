@@ -22,12 +22,27 @@ interface KitEngine {
     /** 用户输入取消（= 拒绝语义）。 */
     fun cancelUserInput()
 
-    /** PLAN 档人控门应答回传。 */
+    /**
+     * PLAN 档人控门应答回传。
+     */
     fun submitPlanConfirmation(
         confirmed: Boolean,
         enabledSteps: List<Int>?,
         order: List<Int>?
     )
+
+    /**
+     * #340（宿主同型）：带投递回执的计划确认提交 —— 存在挂起等待且投递
+     * 成功 → true；等待已超时收场（或无 pending 请求 / 重复应答）→ false。
+     * submitUserInputIfAwaiting 先例：旧签名 [submitPlanConfirmation] 保持
+     * Unit 不动（接口稳定契约面 + consumer-check 宿主main 兼容），Boolean
+     * 回执走新增方法。
+     */
+    fun submitPlanConfirmationIfAwaiting(
+        confirmed: Boolean,
+        enabledSteps: List<Int>?,
+        order: List<Int>?
+    ): Boolean
 
     /**
      * 运行中转向（steering）：把补充指令入队，下个回合边界注入为用户

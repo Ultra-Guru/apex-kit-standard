@@ -398,6 +398,42 @@ class AgentLoopEngineTest {
         assertTrue(complete.fullText.contains("驳回"))
     }
 
+    // ═══ #340 计划确认 Boolean 回执（IfAwaiting 变体） ═══
+
+    @Test
+    fun `plan confirmation receipt is false when no wait is pending`() = runTest {
+        // 空闲引擎：无挂起等待 → 回执 false（迟到/重复应答的显式信号）。
+        val engine = engine(ScriptedKitModelClient(), FakeKitToolRunner())
+        assertFalse(engine.submitPlanConfirmationIfAwaiting(true, null, null))
+        assertFalse(engine.submitPlanConfirmationIfAwaiting(false, null, null))
+    }
+
+    @Test
+    fun `plan confirmation receipt is true while awaiting then false after answer`() = runTest {
+        val llm = ScriptedKitModelClient()
+        llm.enqueue(KitStreamChunk(content = "### Goal\ng\n\n### Steps\n1. a", isFinish = true))
+        val engine = engine(llm, FakeKitToolRunner())
+        engine.updateMode("plan")
+
+        val collected = mutableListOf<KitEvent>()
+        val job = async { engine.execute(KitUserInput.text("q")).collect { collected += it }; true }
+        while (collected.none { it is KitEvent.PlanAwaitingConfirmation }) delay(10)
+
+        // 挂起等待期间送达 → true；同一应答重复投递 / 收场后再投 → false。
+        assertTrue(engine.submitPlanConfirmationIfAwaiting(true, null, null))
+        while (!job.isCompleted) delay(10)
+        job.await()
+        assertFalse(engine.submitPlanConfirmationIfAwaiting(true, null, null))
+    }
+
+    @Test
+    fun `ask permission user input receipt is false when idle`() = runTest {
+        // #340：submitUserInput 空闲投递不再有 NPE 风险（AtomicReference 兜底）。
+        val engine = engine(ScriptedKitModelClient(), FakeKitToolRunner())
+        engine.submitUserInput("允许")
+        engine.cancelUserInput()
+    }
+
     // ═══ 防循环与预算 ═══
 
     @Test

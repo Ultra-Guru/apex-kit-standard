@@ -4,6 +4,7 @@ import java.io.File
 import java.time.LocalDate
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
@@ -133,8 +134,12 @@ class AgentLoopEngine(
     /** 运行态。 */
     @Volatile
     private var isRunning: Boolean = false
-    private var userInputDeferred: CompletableDeferred<String>? = null
-    private var planConfirmationDeferred: CompletableDeferred<PlanAnswer>? = null
+
+    // #340（宿主 issue 340 同型整改）：两问答回执通道 AtomicReference 化 ——
+    // 旧实现连 @Volatile 都缺：引擎协程写、UI 线程读，无任何同步保证；
+    // abort 的「complete 后置 null」在无同步下还可能与 submit 竞态。
+    private val userInputDeferred = AtomicReference<CompletableDeferred<String>?>(null)
+    private val planConfirmationDeferred = AtomicReference<CompletableDeferred<PlanAnswer>?>(null)
 
     /** usage 校准：服务端 promptTokens / 本地估算比值。 */
     @Volatile
@@ -259,25 +264,25 @@ class AgentLoopEngine(
             )
         } finally {
             isRunning = false
-            userInputDeferred?.complete("")
-            planConfirmationDeferred?.complete(PlanAnswer.rejected())
-            userInputDeferred = null
-            planConfirmationDeferred = null
+            // #340：原子换引用后 complete（与宿主 ApexAgentEngine.abort 同型）。
+            userInputDeferred.getAndSet(null)?.complete("")
+            planConfirmationDeferred.getAndSet(null)?.complete(PlanAnswer.rejected())
         }
     }
 
     override suspend fun abort() {
         isRunning = false
-        userInputDeferred?.complete("")
-        planConfirmationDeferred?.complete(PlanAnswer.rejected())
+        // #340：原子换引用后 complete —— 与 submitUserInput 等的读改写互斥于同一字段。
+        userInputDeferred.getAndSet(null)?.complete("")
+        planConfirmationDeferred.getAndSet(null)?.complete(PlanAnswer.rejected())
     }
 
     override fun submitUserInput(answer: String) {
-        userInputDeferred?.complete(answer)
+        userInputDeferred.get()?.complete(answer)
     }
 
     override fun cancelUserInput() {
-        userInputDeferred?.complete("")
+        userInputDeferred.get()?.complete("")
     }
 
     override fun pushSteer(text: String): Boolean {
@@ -402,10 +407,14 @@ class AgentLoopEngine(
                         contentBuilder.append(it)
                         emit(KitEvent.ResponseChunk(it))
                     }
-                    chunk.reasoningContent?.let {
-                        reasoningBuilder.append(it)
-                        emit(KitEvent.ThinkingChunk(it))
-                    }
+                    chunk.reasoningContent
+                        // 空串思考帧过滤（宿主 issue：不思考模型会发空 reasoning 帧，
+                        // 建出永不收尾的「空思考卡」；同宿主 ApexAgentEngine 侧修）。
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let {
+                            reasoningBuilder.append(it)
+                            emit(KitEvent.ThinkingChunk(it))
+                        }
                     chunk.usage?.let { usage ->
                         report.promptTokens += usage.promptTokens
                         report.completionTokens += usage.completionTokens
@@ -826,16 +835,20 @@ class AgentLoopEngine(
         emit: suspend (KitEvent) -> Unit
     ): Pair<KitPermissionResponse, String?> {
         val preview = call.arguments.take(160)
-        emit(
-            KitEvent.UserInputRequired(
-                prompt = "工具 `$toolName` 请求执行（权限门：$toolName）。\n" +
-                    "参数预览：$preview\n" +
-                    "回复「允许」= 本次执行；「总是」= 本会话内该工具总允许；" +
-                    "其他任意回复 = 拒绝（回复内容会作为指示转达给模型）；不回复 = 拒绝。",
-                type = KitInputType.CONFIRMATION
+        // #340：注册先行 —— UserInputRequired 的 emit 经 onRegistered 在
+        // deferred 注册之后发射（PR #330 实证竞态根因：镜像收集使 emit 立即
+        // 返回，submit 在 deferred 创建前到达则 complete 落空，引擎挂满超时）。
+        val raw = awaitUserInput {
+            emit(
+                KitEvent.UserInputRequired(
+                    prompt = "工具 `$toolName` 请求执行（权限门：$toolName）。\n" +
+                        "参数预览：$preview\n" +
+                        "回复「允许」= 本次执行；「总是」= 本会话内该工具总允许；" +
+                        "其他任意回复 = 拒绝（回复内容会作为指示转达给模型）；不回复 = 拒绝。",
+                    type = KitInputType.CONFIRMATION
+                )
             )
-        )
-        val raw = awaitUserInput()
+        }
         val answer = raw.trim().lowercase()
         val response = when {
             answer in ALLOW_ONCE_WORDS -> KitPermissionResponse.ALLOW_ONCE
@@ -923,16 +936,18 @@ class AgentLoopEngine(
         }
     }
 
-    /** 挂起等待用户输入（超时 = 空串 = 拒绝语义）。 */
-    private suspend fun awaitUserInput(): String {
+    /** 挂起等待用户输入（超时 = 空串 = 拒绝语义；#340 注册先行）。 */
+    internal suspend fun awaitUserInput(onRegistered: (suspend () -> Unit)? = null): String {
         val deferred = CompletableDeferred<String>()
-        userInputDeferred = deferred
+        // #340：deferred 先于 UserInputRequired 的 emit 创建。
+        userInputDeferred.set(deferred)
         return try {
+            onRegistered?.invoke()
             withTimeout(config.userInputTimeoutMs) { deferred.await() }
         } catch (e: TimeoutCancellationException) {
             ""
         } finally {
-            userInputDeferred = null
+            userInputDeferred.compareAndSet(deferred, null)
         }
     }
 
@@ -1019,9 +1034,8 @@ class AgentLoopEngine(
             return
         }
         emit(KitEvent.PlanGenerated(plan))
-        emit(KitEvent.PlanAwaitingConfirmation(plan))
-
-        val answer = awaitPlanConfirmation()
+        // #340：注册先行 —— deferred 先于 PlanAwaitingConfirmation 的 emit 创建。
+        val answer = awaitPlanConfirmation { emit(KitEvent.PlanAwaitingConfirmation(plan)) }
         if (!answer.confirmed) {
             session.append(KitMessage.System("用户驳回了该计划。"))
             emit(
@@ -1049,16 +1063,17 @@ class AgentLoopEngine(
         runTurns(emit, report)
     }
 
-    /** 计划确认挂起（超时 = 驳回）。 */
-    private suspend fun awaitPlanConfirmation(): PlanAnswer {
+    /** 计划确认挂起（超时 = 驳回；#340 注册先行）。 */
+    private suspend fun awaitPlanConfirmation(onRegistered: (suspend () -> Unit)? = null): PlanAnswer {
         val deferred = CompletableDeferred<PlanAnswer>()
-        planConfirmationDeferred = deferred
+        planConfirmationDeferred.set(deferred)
         return try {
+            onRegistered?.invoke()
             withTimeout(config.planConfirmationTimeoutMs) { deferred.await() }
         } catch (e: TimeoutCancellationException) {
             PlanAnswer.rejected()
         } finally {
-            planConfirmationDeferred = null
+            planConfirmationDeferred.compareAndSet(deferred, null)
         }
     }
 
@@ -1108,7 +1123,18 @@ class AgentLoopEngine(
         enabledSteps: List<Int>?,
         order: List<Int>?
     ) {
-        planConfirmationDeferred?.complete(PlanAnswer(confirmed, enabledSteps, order))
+        // #340：AtomicReference 读取 + complete（投递回执由 IfAwaiting 变体返回）。
+        planConfirmationDeferred.get()?.complete(PlanAnswer(confirmed, enabledSteps, order))
+    }
+
+    override fun submitPlanConfirmationIfAwaiting(
+        confirmed: Boolean,
+        enabledSteps: List<Int>?,
+        order: List<Int>?
+    ): Boolean {
+        // #340：Boolean 回执（false = 未送达：等待已收场 / 无挂起请求 / 重复应答）。
+        return planConfirmationDeferred.get()
+            ?.complete(PlanAnswer(confirmed, enabledSteps, order)) ?: false
     }
 
     override fun updateRolePersona(roleDefinition: String, rolePrompt: String?) {

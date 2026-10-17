@@ -23,7 +23,7 @@ dependencies {
 
 // composite build 依赖替换：宿主 includeBuild 时按 group:name 自动替换远端坐标
 group = "com.apex.standardkit"
-version = "1.1.0"
+version = "1.1.1"
 
 mavenPublishing {
     configure(KotlinJvm(javadocJar = JavadocJar.None(), sourcesJar = true))
