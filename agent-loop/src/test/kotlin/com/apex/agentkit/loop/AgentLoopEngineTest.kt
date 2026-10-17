@@ -55,7 +55,7 @@ class AgentLoopEngineTest {
         assertEquals(1, done.totalIterations)
         assertEquals(0, done.totalToolCalls)
         // 系统提示词包含画像身份与方法论
-        val system = llm.streamRequests.single().first as KitMessage.System
+        val system = llm.streamRequests.single().first.first() as KitMessage.System
         assertTrue(system.content.contains("BUILD agent"))
         assertTrue(system.content.contains("Task Methodology"))
         assertTrue(system.content.contains("task"))
@@ -478,7 +478,7 @@ class AgentLoopEngineTest {
         assertTrue(engine.maxContextTokens() > 0)
         // 人设段进系统提示词
         engine.execute(KitUserInput.text("q")).toList()
-        val system = llm.streamRequests.single().first as KitMessage.System
+        val system = llm.streamRequests.single().first.first() as KitMessage.System
         assertTrue(system.content.contains("## Coding Role"))
         assertTrue(system.content.contains("Kotlin 专家"))
         assertTrue(system.content.contains("附加：时间感知"))
@@ -567,7 +567,7 @@ class AgentLoopEngineTest {
             }
         )
         engine.execute(KitUserInput.text("q")).toList()
-        val system = llm.streamRequests.single().first as KitMessage.System
+        val system = llm.streamRequests.single().first.first() as KitMessage.System
         assertTrue(system.content.contains("You are powered by the model named test-model-x"))
         assertTrue(system.content.contains("Today's date"))
         assertTrue(system.content.contains("Android with sandbox"))

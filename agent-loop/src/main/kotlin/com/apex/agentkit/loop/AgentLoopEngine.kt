@@ -10,7 +10,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -205,10 +205,12 @@ class AgentLoopEngine(
 
     // ═══════════════════════ KitEngine ═══════════════════════
 
-    override fun execute(input: KitUserInput): Flow<KitEvent> = flow {
+    // channelFlow 而非 flow：并行工具批的发射来自多个子协程
+    //（FlowCollector 非线程安全，跨协程发射是硬违规——channel 的 send 线程安全）。
+    override fun execute(input: KitUserInput): Flow<KitEvent> = channelFlow {
         if (isRunning) {
-            emit(KitEvent.Error("标准引擎已在运行中（上一轮任务未结束）"))
-            return@flow
+            send(KitEvent.Error("标准引擎已在运行中（上一轮任务未结束）"))
+            return@channelFlow
         }
         isRunning = true
         val runId = runCounter.incrementAndGet()
@@ -223,14 +225,14 @@ class AgentLoopEngine(
             session.append(userMessage)
             memory?.append(userMessage)
 
-            // flow 构建器内的 emit 是成员函数而非函数值——包一层 lambda 传递
-            val emitEvents: suspend (KitEvent) -> Unit = { event -> emit(event) }
+            // channelFlow 构建器内的 send 是成员函数而非函数值——包一层 lambda 传递
+            val emitEvents: suspend (KitEvent) -> Unit = { event -> send(event) }
             val planText = runTurns(emitEvents, report)
             if (planText != null) {
                 // PLAN 档：规划产出 → 人控门 →（确认后）切构建者执行
                 handlePlanGate(planText, emitEvents, report)
             }
-            emit(
+            send(
                 KitEvent.Complete(
                     summary = finalSummaryText(report),
                     totalIterations = report.turns,
@@ -241,12 +243,13 @@ class AgentLoopEngine(
         } catch (e: CancellationException) {
             isRunning = false
             persistSnapshot()
-            emit(KitEvent.Aborted)
+            // 流被取消时 channel 可能已关——尽力发射（失败不影响取消传播）
+            runCatching { send(KitEvent.Aborted) }
             throw e
         } catch (t: Throwable) {
             report.errorMessage = t.message ?: t::class.simpleName ?: "unknown error"
-            emit(KitEvent.Error(report.errorMessage ?: "unknown error", recoverable = false))
-            emit(
+            send(KitEvent.Error(report.errorMessage ?: "unknown error", recoverable = false))
+            send(
                 KitEvent.Complete(
                     summary = finalSummaryText(report),
                     totalIterations = report.turns,
@@ -467,9 +470,10 @@ class AgentLoopEngine(
                         )
                         continue
                     }
-                    // 续跑预算耗尽：按部分结果诚实收尾
+                    // 续跑预算耗尽：按部分结果诚实收尾（附中断说明）
                     val settled = contentBuilder.toString().trim()
-                        .ifBlank { "（本轮输出因传输中断不完整）" }
+                        .ifBlank { "（本轮输出因传输中断不完整）" } +
+                        "\n\n[请求中断：${outcome.reason}]"
                     session.append(KitMessage.Assistant(settled))
                     memory?.append(KitMessage.Assistant(settled))
                     if (profile.kind == KitAgentKind.PLAN && !subAgentMode) {

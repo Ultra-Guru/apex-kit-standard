@@ -89,7 +89,7 @@ class KitPromptsTest {
         assertTrue(c.contains("under 4 lines"))
         assertTrue(c.contains("emoji if the user explicitly requests"))
         // 并行化（新增）
-        assertTrue(c.contains("Prefer parallel tool calls when they are independent"))
+        assertTrue(c.contains("prefer parallel tool calls when they are independent"))
         // 专业客观
         assertTrue(c.contains("technical accuracy beats agreement"))
         // 文件纪律

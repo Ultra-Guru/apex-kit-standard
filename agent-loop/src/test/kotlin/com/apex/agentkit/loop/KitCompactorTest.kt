@@ -185,22 +185,18 @@ class KitCompactorTest {
     @Test
     fun `token keep window widens boundary beyond message count`() {
         val compactor = compactor(ScriptedKitModelClient())
-        // 小消息 × 6（每条 ~30 token）：token 窗 50 → 从尾累计 2 条就超
-        val small = listOf(
-            KitMessage.User("q"),
-            KitMessage.Assistant("a1"),
-            KitMessage.Assistant("a2"),
-            KitMessage.Assistant("a3"),
-            KitMessage.Assistant("a4"),
-            KitMessage.Assistant("a5")
-        )
-        val byCount = compactor.keepBoundary(small, preserveRecentMessages = 4, preserveRecentTokens = 0)
-        assertEquals(2, byCount)
-        val byTokens = compactor.keepBoundary(small, preserveRecentMessages = 0, preserveRecentTokens = 120)
-        // token 窗 120（约 4 条小消息）→ 边界 2
-        assertEquals(2, byTokens)
-        // 两者取大：合成为 max(2, 2) = 2
-        assertEquals(2, compactor.keepBoundary(small, 4, 120))
+        // 6 条消息 × 每条 400 chars ASCII（~100 tokens）
+        val messages = (1..6).map { KitMessage.Assistant("x".repeat(400)) }
+        // 纯条数窗（token 窗关闭）：保留 4 条 → 边界 2
+        assertEquals(2, compactor.keepBoundary(messages, preserveRecentMessages = 4, preserveRecentTokens = 0))
+        // 纯 token 窗（条数窗关闭）：保留 ~250 tokens（≈3 条）→ 边界 3
+        assertEquals(3, compactor.keepBoundary(messages, preserveRecentMessages = 0, preserveRecentTokens = 250))
+        // 两者取大：条数窗 4（边界 2）vs token 窗 250（边界 3）→ 3
+        assertEquals(3, compactor.keepBoundary(messages, preserveRecentMessages = 4, preserveRecentTokens = 250))
+        // 条数窗更大时条数窗胜出：保留 5 条（边界 1）vs token 窗 3 → 3
+        assertEquals(3, compactor.keepBoundary(messages, preserveRecentMessages = 5, preserveRecentTokens = 250))
+        // 极大 token 窗（覆盖全部）→ 边界 0（全部可压）
+        assertEquals(0, compactor.keepBoundary(messages, preserveRecentMessages = 0, preserveRecentTokens = 10_000))
     }
 
     // ═══ 溢出 shrink 阶梯 ═══

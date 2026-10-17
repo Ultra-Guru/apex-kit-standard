@@ -316,7 +316,7 @@ class AgentLoopEngineEnhancementsTest {
         )
         engine.execute(KitUserInput.text("q")).toList()
 
-        val system = llm.streamRequests.single().first as KitMessage.System
+        val system = llm.streamRequests.single().first.first() as KitMessage.System
         // 在面的服务器指令注入
         assertTrue(system.content.contains("<mcp_instructions>"))
         assertTrue(system.content.contains("github"))
@@ -343,7 +343,7 @@ class AgentLoopEngineEnhancementsTest {
         )
         engine.execute(KitUserInput.text("q")).toList()
 
-        val system = llm.streamRequests.single().first as KitMessage.System
+        val system = llm.streamRequests.single().first.first() as KitMessage.System
         assertFalse(system.content.contains("<mcp_instructions>"))
     }
 
@@ -395,7 +395,7 @@ class AgentLoopEngineEnhancementsTest {
         )
         engine.execute(KitUserInput.text("q")).toList()
 
-        val system = llm.streamRequests.single().first as KitMessage.System
+        val system = llm.streamRequests.single().first.first() as KitMessage.System
         assertTrue(system.content.contains("## Workspace"))
         assertTrue(system.content.contains("## Global Rules"))
         assertTrue(system.content.contains("## Project Rules"))

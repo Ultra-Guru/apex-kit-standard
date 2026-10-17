@@ -162,10 +162,11 @@ class KitCompactor(
         preserveRecentTokens: Int
     ): Int {
         val countBoundary = messages.size - preserveRecentMessages.coerceAtLeast(2)
-        val tokenBoundary = run {
+        // token 窗（<= 0 = 不启用，边界贡献 0——纯条数窗语义）
+        val tokenBoundary = if (preserveRecentTokens <= 0) 0 else run {
             var acc = 0
             var i = messages.size
-            while (i > 0 && acc < preserveRecentTokens.coerceAtLeast(0)) {
+            while (i > 0 && acc < preserveRecentTokens) {
                 i--
                 acc += estimate(listOf(messages[i]))
             }
