@@ -117,7 +117,7 @@ internal fun testEngine(
     workspaceContextSource: KitWorkspaceContextSource? = null,
     mcpInstructionSource: KitMcpInstructionSource? = null,
     errorClassifier: KitLlmErrorClassifier = KitLlmErrorClassifier.Default,
-    retrySleeper: suspend (Long) -> Unit = { }
+    retrySleeper: (suspend (Long) -> Unit)? = null
 ): AgentLoopEngine = AgentLoopEngine(
     modelClient = modelClient,
     toolSource = object : KitToolSource {

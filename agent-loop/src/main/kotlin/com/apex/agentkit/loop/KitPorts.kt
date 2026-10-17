@@ -114,17 +114,19 @@ fun interface KitLlmErrorClassifier {
          * 通用分类：消息文本嗅探（溢出特征词）→ IOException（瞬时）→ 其余
          * 4xx/配置类按类型名启发（宿主专用异常类型应优先由宿主分类）。
          */
-        val Default: KitLlmErrorClassifier = KitLlmErrorClassifier { t ->
-            val text = (t.message ?: "").lowercase()
-            when {
-                OVERFLOW_MARKERS.any { text.contains(it) } -> KitLlmErrorKind.CONTEXT_OVERFLOW
-                t is java.io.IOException -> KitLlmErrorKind.TRANSIENT
-                text.contains("timeout") || text.contains("timed out") -> KitLlmErrorKind.TRANSIENT
-                text.contains("rate limit") || text.contains("429") -> KitLlmErrorKind.TRANSIENT
-                text.contains("401") || text.contains("403") || text.contains("404") ||
-                    text.contains("api key") || text.contains("unauthorized") ->
-                    KitLlmErrorKind.REQUEST_REJECTION
-                else -> KitLlmErrorKind.FATAL
+        val Default: KitLlmErrorClassifier = object : KitLlmErrorClassifier {
+            override fun classify(t: Throwable): KitLlmErrorKind {
+                val text = (t.message ?: "").lowercase()
+                return when {
+                    OVERFLOW_MARKERS.any { text.contains(it) } -> KitLlmErrorKind.CONTEXT_OVERFLOW
+                    t is java.io.IOException -> KitLlmErrorKind.TRANSIENT
+                    text.contains("timeout") || text.contains("timed out") -> KitLlmErrorKind.TRANSIENT
+                    text.contains("rate limit") || text.contains("429") -> KitLlmErrorKind.TRANSIENT
+                    text.contains("401") || text.contains("403") || text.contains("404") ||
+                        text.contains("api key") || text.contains("unauthorized") ->
+                        KitLlmErrorKind.REQUEST_REJECTION
+                    else -> KitLlmErrorKind.FATAL
+                }
             }
         }
 

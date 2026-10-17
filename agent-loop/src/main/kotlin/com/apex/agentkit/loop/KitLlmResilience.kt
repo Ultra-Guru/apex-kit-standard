@@ -49,7 +49,10 @@ internal object KitLlmResilience {
      * 带容错地执行一次流式请求。
      *
      * @param emit 事件发射器（与引擎同通道）
-     * @param retrySleeper 阶梯延迟执行器（注入点）
+     * @param retrySleeper 阶梯延迟执行器（注入点；null = 真实 delay——
+     *   注意不能写成 suspend lambda 默认值：那是 Kotlin IR lower 的已知
+     *   崩溃触发器（AddContinuationLowering 断言），这里用可空参数 +
+     *   函数体内部归一规避）
      * @param classifier 失败分类器
      * @param hasPartialOutput 本轮是否已有部分输出（内容/思考/工具片段任一）
      * @param attempt 一次流式请求（collect 向调用方闭包持有的累积器写输出）；
@@ -58,11 +61,12 @@ internal object KitLlmResilience {
      */
     suspend fun run(
         emit: suspend (KitEvent) -> Unit,
-        retrySleeper: suspend (Long) -> Unit = { delay(it) },
-        classifier: KitLlmErrorClassifier = KitLlmErrorClassifier.Default,
-        hasPartialOutput: () -> Boolean,
+        retrySleeper: (suspend (Long) -> Unit)?,
+        classifier: KitLlmErrorClassifier,
+        hasPartialOutput: suspend () -> Boolean,
         attempt: suspend (textOnly: Boolean) -> String?
     ): ResilienceOutcome {
+        val sleeper: suspend (Long) -> Unit = retrySleeper ?: { ms -> delay(ms) }
         var retryIndex = 0
         var degradedToTextOnly = false
         while (true) {
@@ -107,7 +111,7 @@ internal object KitLlmResilience {
                                     reason = (e.message ?: e::class.simpleName ?: "unknown").take(80)
                                 )
                             )
-                            retrySleeper(delayMs)
+                            sleeper(delayMs)
                             retryIndex++
                         } else {
                             return ResilienceOutcome.Failed(e)
