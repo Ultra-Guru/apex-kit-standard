@@ -522,7 +522,7 @@ class AgentLoopEngineTest {
                 saved = saved + message
             }
 
-            override suspend fun save(messages: List<KitMessage>) {
+            override fun save(messages: List<KitMessage>) {
                 saved = messages
             }
 

@@ -189,7 +189,12 @@ class AgentLoopEngine(
                 ).apply { profile = definition }
             },
             budgetSource = subAgentBudgetSource
-                ?: { KitSubAgentBudget(maxConcurrent = config.subAgentMaxConcurrent, timeoutMs = config.subAgentTimeoutMs) },
+                ?: KitSubAgentBudgetSource {
+                    KitSubAgentBudget(
+                        maxConcurrent = config.subAgentMaxConcurrent,
+                        timeoutMs = config.subAgentTimeoutMs
+                    )
+                },
             logger = logger
         )
 
@@ -1065,12 +1070,13 @@ class AgentLoopEngine(
         this.workspace = workspace
         // 换工作区 = 新文件域：read-before-edit 追踪面清零重新累积
         readGuard.reset()
-        memory?.bindWorkspace(workspace.workspaceId)
+        val info = workspace ?: return
+        memory?.bindWorkspace(info.workspaceId)
         val history = memory?.load() ?: emptyList()
         session.restore(history)
         logger.info(
             TAG,
-            "Loop engine workspace activated: ${workspace.workspaceId} (history=${history.size})"
+            "Loop engine workspace activated: ${info.workspaceId} (history=${history.size})"
         )
     }
 

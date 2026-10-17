@@ -257,7 +257,7 @@ class KitCompactor(
                 is KitMessage.Assistant -> {
                     appendLine("ASSISTANT: " + firstLines(msg.content, 6))
                     msg.toolCalls.forEach { tc ->
-                        appendLine("ASSISTANT calls ${tcName(it.name)}(${firstLines(tc.arguments, 2)})")
+                        appendLine("ASSISTANT calls ${tcName(tc.name)}(${firstLines(tc.arguments, 2)})")
                     }
                 }
                 is KitMessage.ToolResult -> appendLine("TOOL ${msg.toolCallId}: " + firstLines(msg.content, 3))

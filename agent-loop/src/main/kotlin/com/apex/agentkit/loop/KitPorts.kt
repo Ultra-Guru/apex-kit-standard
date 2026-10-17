@@ -147,7 +147,10 @@ fun interface KitLlmErrorClassifier {
  */
 interface KitMemory {
     fun append(message: KitMessage)
-    suspend fun save(messages: List<KitMessage>)
+
+    /** 整体保存（同步语义——宿主实现内部自管异步落盘）。 */
+    fun save(messages: List<KitMessage>)
+
     fun load(): List<KitMessage>
     fun clear()
     fun count(): Int
@@ -162,7 +165,7 @@ interface KitMemory {
  * 契约：无副作用、线程安全、任何异常自吞（估算失败返回 0 = 未知，
  * 引擎走纯 Kotlin 估算）。
  */
-interface KitTextKernel {
+fun interface KitTextKernel {
     fun estimateTokens(text: String): Int
 }
 
