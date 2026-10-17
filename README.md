@@ -1,6 +1,6 @@
 # apex-agent-kit
 
-> `com.apex.agentkit:agent-loop` — Pure-Kotlin agent task-loop engine for mobile coding workspaces. **Zero Android deps.**
+> `com.apex.standardkit:agent-loop` — Pure-Kotlin agent task-loop engine for mobile coding workspaces. **Zero Android deps.**
 
 从 Android-Guru-Agent 的 Coding「标准思考逻辑线」提取的独立库模块：业界标准 Agent 任务循环的完整内核，经端口-适配器模式与宿主解耦——任何 JVM/Android 宿主实现端口即可接入。
 
@@ -8,7 +8,7 @@
 
 | 模块 | 坐标 | 说明 |
 |---|---|---|
-| `agent-loop` | `com.apex.agentkit:agent-loop` | 任务循环引擎（纯 Kotlin JVM，仅依赖 coroutines） |
+| `agent-loop` | `com.apex.standardkit:agent-loop` | 任务循环引擎（纯 Kotlin JVM，仅依赖 coroutines） |
 
 ## 能力总览
 
@@ -47,7 +47,7 @@ user msg ──► [steer drain] ──► [compaction?] ──► build system(
 
 ```kotlin
 dependencies {
-    implementation("com.apex.agentkit:agent-loop:1.0.0")
+    implementation("com.apex.standardkit:agent-loop:1.0.0")
 }
 ```
 
@@ -104,7 +104,7 @@ engine.execute(KitUserInput.text("修复登录崩溃")).collect { event ->
 
 ## 消费方式（宿主）
 
-迁移期 composite build：宿主 `settings.gradle.kts` 条件 `includeBuild`（兄弟目录 `../apex-agent-kit` 或嵌套目录），坐标 `com.apex.agentkit:agent-loop` 自动替换为本地构建。CI 由宿主流水线按 `gradle/agent-kit.lock` 锁定版本检出。
+迁移期 composite build：宿主 `settings.gradle.kts` 条件 `includeBuild`（兄弟目录 `../apex-agent-kit` 或嵌套目录），坐标 `com.apex.standardkit:agent-loop` 自动替换为本地构建。CI 由宿主流水线按 `gradle/agent-kit.lock` 锁定版本检出。
 
 ## 开发
 

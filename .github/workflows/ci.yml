@@ -1,6 +1,6 @@
 name: CI
 
-# apex-agent-kit CI —— 两道防线：
+# apex-standard-kit CI —— 两道防线：
 #   1. build-test：库自身编译 + 单测 + publishToMavenLocal 可发布性
 #   2. consumer-check：跨仓库验证宿主 Android-Guru-Agent 仍能编译（防下游崩，
 #      跨仓库 CI 漂移的解法）—— 库的每次 PR 都对宿主 :app:compileDebugKotlin
@@ -8,7 +8,7 @@ name: CI
 #
 # 宿主消费方式（迁移期 composite build）：宿主 settings.gradle.kts 里有
 # 条件 includeBuild —— 当兄弟目录 ../Android-Guru-Agent 存在时接入并按坐标
-# com.apex.agentkit:agent-loop 自动替换。本 workflow 把两个仓库 checkout 成
+# com.apex.standardkit:standard-loop 自动替换。本 workflow 把两个仓库 checkout 成
 # 兄弟布局，正好命中该条件。
 
 on:
@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build-test:
-    name: Build & Test (agent-loop)
+    name: Build & Test (standard-loop)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -42,22 +42,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build module (compile only first for fast feedback)
-        run: ./gradlew :agent-loop:assemble --no-daemon --stacktrace
+        run: ./gradlew :standard-loop:assemble --no-daemon --stacktrace
 
-      # 纯 JVM 测试必须独立跑（agent-loop 零 Android 依赖的可执行证明）
-      - name: agent-loop pure-JVM tests
-        run: ./gradlew :agent-loop:test --no-daemon
+      # 纯 JVM 测试必须独立跑（standard-loop 零 Android 依赖的可执行证明）
+      - name: standard-loop pure-JVM tests
+        run: ./gradlew :standard-loop:test --no-daemon
 
       # 可发布性验证：坐标/POM 生成必须完整
       - name: publishToMavenLocal smoke check
         run: |
           ./gradlew publishToMavenLocal --no-daemon
-          VER=$(grep -m1 '^version = "' agent-loop/build.gradle.kts | sed 's/version = "//;s/"//')
-          echo "smoke-checking com.apex.agentkit:agent-loop:$VER"
-          if ls ~/.m2/repository/com/apex/agentkit/agent-loop/$VER/agent-loop-$VER.{module,pom} >/dev/null 2>&1; then
-            echo "✅ com.apex.agentkit:agent-loop:$VER published to mavenLocal"
+          VER=$(grep -m1 '^version = "' standard-loop/build.gradle.kts | sed 's/version = "//;s/"//')
+          echo "smoke-checking com.apex.standardkit:standard-loop:$VER"
+          if ls ~/.m2/repository/com/apex/standardkit/standard-loop/$VER/standard-loop-$VER.{module,pom} >/dev/null 2>&1; then
+            echo "✅ com.apex.standardkit:standard-loop:$VER published to mavenLocal"
           else
-            echo "❌ com.apex.agentkit:agent-loop:$VER missing in mavenLocal"; exit 1
+            echo "❌ com.apex.standardkit:standard-loop:$VER missing in mavenLocal"; exit 1
           fi
 
       - name: Upload test reports on failure
@@ -65,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: agent-loop/build/reports/tests/
+          path: standard-loop/build/reports/tests/
           retention-days: 7
 
   consumer-check:
@@ -76,7 +76,7 @@ jobs:
       - name: Checkout this repo (sibling layout)
         uses: actions/checkout@v4
         with:
-          path: apex-agent-kit
+          path: apex-standard-kit
 
       - name: Checkout host repo (sibling layout)
         uses: actions/checkout@v4
@@ -114,12 +114,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # 宿主 settings.gradle.kts 的嵌套兜底分支（apex-agent-kit 子目录）命中——
-      # composite build 把 com.apex.agentkit:agent-loop 替换为本仓库检出。
+      # 宿主 settings.gradle.kts 的嵌套兜底分支（apex-standard-kit 子目录）命中——
+      # composite build 把 com.apex.standardkit:standard-loop 替换为本仓库检出。
       - name: Link kit into host nested fallback path
         run: |
-          ln -s "$GITHUB_WORKSPACE/apex-agent-kit" "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-agent-kit"
-          ls -la "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-agent-kit"
+          ln -s "$GITHUB_WORKSPACE/apex-standard-kit" "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-standard-kit"
+          ls -la "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-standard-kit"
 
       - name: Compile host app module (Kotlin only, no APK packaging)
         working-directory: Android-Guru-Agent
