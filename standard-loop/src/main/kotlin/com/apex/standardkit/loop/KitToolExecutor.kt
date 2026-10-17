@@ -256,7 +256,10 @@ object KitToolOutputBudget {
     const val OMIT_MARKER = "[... output truncated (kept head 70% / tail 30%) ...]"
 
     /** 是否需要截断（不产生新字符串——预算探测）。 */
-    fun needsTruncation(text: String, config: KitToolOutputBudgetConfig): Boolean {
+    fun needsTruncation(
+        text: String,
+        config: KitToolOutputBudgetConfig = KitToolOutputBudgetConfig.DEFAULT
+    ): Boolean {
         if (text.length > config.maxChars) return true
         if (text.toByteArray(Charsets.UTF_8).size > config.maxBytes) return true
         if (lineCount(text) > config.maxLines) return true
