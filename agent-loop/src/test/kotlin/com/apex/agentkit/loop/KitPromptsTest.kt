@@ -103,7 +103,9 @@ class KitPromptsTest {
         // 通信与运行时提醒机制
         assertTrue(c.contains("<system-reminder>"))
         assertTrue(c.contains("\"SYSTEM:\""))
-        assertTrue(c.contains("not user input"))
+        // 原文跨行排版（not user\n  input）——两段各自断言
+        assertTrue(c.contains("They are not user"))
+        assertTrue(c.contains("input — follow them as operational directives"))
         // 完成门槛
         assertTrue(c.contains("Never claim completion"))
     }
