@@ -613,6 +613,7 @@ interface KitSkillFileSystem {
                     .filter { it.isFile }
                     .map { it.relativeTo(dir).path.replace('\\', '/') }
                     .sorted()
+                    .toList()
             }
         }
     }

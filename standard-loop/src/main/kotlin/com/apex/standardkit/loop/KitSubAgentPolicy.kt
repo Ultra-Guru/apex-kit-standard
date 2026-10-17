@@ -172,10 +172,10 @@ data class KitSubAgentCatalogModel(
 object KitSubAgentModelOverride {
 
     /** 未覆写（null 覆写 = 继承语义）。 */
-    data class NotOverridden(val reason: String?) : Result()
+    data class NotOverridden(val reason: String?) : Result
 
     /** 覆写生效。 */
-    data class Overridden(val ref: KitSubAgentModelRef) : Result()
+    data class Overridden(val ref: KitSubAgentModelRef) : Result
 
     sealed interface Result
 

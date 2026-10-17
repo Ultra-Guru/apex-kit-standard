@@ -86,7 +86,7 @@ object KitMcpNames {
         "${namespace(server)}_${sanitizeToolName(tool)}"
 
     /** 注册表 id（`mcp__{server}__{tool}`，原始名透传）。 */
-    fun registryId(server: String, tool: String): String = "$REGISTRY_PREFIX$server__$tool"
+    fun registryId(server: String, tool: String): String = "$REGISTRY_PREFIX${server}__$tool"
 
     /** 反解注册表 id → (server, tool)（非 MCP 形态 → null）。 */
     fun parseRegistryId(registryId: String): Pair<String, String>? {
@@ -547,7 +547,7 @@ class KitMcpServerHealth(
     fun recordFailure(server: String, error: String?) {
         val state = states.compute(server) { _, existing ->
             existing ?: State()
-        }
+        } ?: return
         synchronized(state) {
             state.consecutiveFailures += 1
             state.lastError = error

@@ -61,7 +61,7 @@ class KitEventBus<E : KitBusEvent>(
     )
 
     /** 广播视图（inline 订阅管道的可发布访问点）。 */
-    @kotlinx.coroutines.flow.PublishedApi
+    @PublishedApi
     internal val sharedFlow: Flow<E> = backbone.asSharedFlow()
 
     /** 发布一条事件（无订阅者 = 蒸发）。 */
