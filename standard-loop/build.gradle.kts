@@ -30,7 +30,8 @@ mavenPublishing {
     coordinates(
         groupId = "com.apex.standardkit",
         artifactId = "standard-loop",
-        version = "1.1.0",
+        // 与上方 project version 同源（CI smoke check 按此 grep 校验 mavenLocal 产物）
+        version = project.version.toString(),
     )
     pom {
         name.set("Apex Standard Kit :: Standard Loop")
