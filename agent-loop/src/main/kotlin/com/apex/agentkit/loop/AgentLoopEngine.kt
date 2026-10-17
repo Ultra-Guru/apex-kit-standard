@@ -188,13 +188,12 @@ class AgentLoopEngine(
                     subAgentMode = true
                 ).apply { profile = definition }
             },
-            budgetSource = subAgentBudgetSource
-                ?: KitSubAgentBudgetSource {
-                    KitSubAgentBudget(
-                        maxConcurrent = config.subAgentMaxConcurrent,
-                        timeoutMs = config.subAgentTimeoutMs
-                    )
-                },
+            budgetSource = {
+                subAgentBudgetSource?.budget() ?: KitSubAgentBudget(
+                    maxConcurrent = config.subAgentMaxConcurrent,
+                    timeoutMs = config.subAgentTimeoutMs
+                )
+            },
             logger = logger
         )
 
