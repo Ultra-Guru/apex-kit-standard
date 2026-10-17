@@ -55,7 +55,7 @@ class AgentLoopEngineTest {
         assertEquals(1, done.totalIterations)
         assertEquals(0, done.totalToolCalls)
         // 系统提示词包含画像身份与方法论
-        val system = llm.streamRequests.single().first() as KitMessage.System
+        val system = llm.streamRequests.single().first as KitMessage.System
         assertTrue(system.content.contains("BUILD agent"))
         assertTrue(system.content.contains("Task Methodology"))
         assertTrue(system.content.contains("task"))

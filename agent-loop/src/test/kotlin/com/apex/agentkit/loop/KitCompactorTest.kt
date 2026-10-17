@@ -73,7 +73,8 @@ class KitCompactorTest {
                 messages: List<KitMessage>,
                 tools: List<KitToolDefinition>,
                 options: KitRequestOptions
-            ) = kotlinx.coroutines.flow.flow { }
+            ): kotlinx.coroutines.flow.Flow<KitStreamChunk> =
+                kotlinx.coroutines.flow.flow { }
 
             override suspend fun chat(
                 contextTag: String,
@@ -154,7 +155,8 @@ class KitCompactorTest {
                 messages: List<KitMessage>,
                 tools: List<KitToolDefinition>,
                 options: KitRequestOptions
-            ) = kotlinx.coroutines.flow.flow { }
+            ): kotlinx.coroutines.flow.Flow<KitStreamChunk> =
+                kotlinx.coroutines.flow.flow { }
 
             override suspend fun chat(
                 contextTag: String,

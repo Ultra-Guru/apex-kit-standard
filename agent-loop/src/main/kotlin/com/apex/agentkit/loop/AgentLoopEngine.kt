@@ -85,14 +85,14 @@ class AgentLoopEngine(
     private val subAgentBudgetSource: KitSubAgentBudgetSource? = null,
     private val errorClassifier: KitLlmErrorClassifier = KitLlmErrorClassifier.Default,
     /** LLM 容错阶梯延迟执行器（测试注入；null = 真实 delay。语义见 [KitLlmResilience]）。 */
-    private val retrySleeperParam: (suspend (Long) -> Unit)? = null,
+    private val retrySleeper: (suspend (Long) -> Unit)? = null,
     /** 子代理运行标记（本实例由 task 工具派生）。 */
     internal val subAgentMode: Boolean = false
 ) : KitEngine {
 
     /** 阶梯延迟执行器（构造参数归一：null → 真实 delay）。 */
-    private val retrySleeper: suspend (Long) -> Unit =
-        retrySleeperParam ?: { ms -> delay(ms) }
+    private val resolvedRetrySleeper: suspend (Long) -> Unit =
+        retrySleeper ?: { ms -> delay(ms) }
 
 
     // ═══════════════════════ 状态 ═══════════════════════
@@ -190,6 +190,7 @@ class AgentLoopEngine(
                     mcpInstructionSource = mcpInstructionSource,
                     subAgentBudgetSource = subAgentBudgetSource,
                     errorClassifier = errorClassifier,
+                    retrySleeper = resolvedRetrySleeper,
                     subAgentMode = true
                 ).apply { profile = definition }
             },
@@ -378,7 +379,7 @@ class AgentLoopEngine(
 
             val outcome = KitLlmResilience.run(
                 emit = emit,
-                retrySleeper = retrySleeper,
+                retrySleeper = resolvedRetrySleeper,
                 classifier = errorClassifier,
                 hasPartialOutput = {
                     contentBuilder.isNotEmpty() ||
