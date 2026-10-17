@@ -242,23 +242,30 @@ class KitMcpBridgeTest {
             tools = listOf(descriptor("alpha", "run"), descriptor("beta", "query"))
         )
         val reloaded = mutableListOf<Int>()
+        // 注册表自带常驻协程（变更订阅 / 防抖循环）——挂独立 Job，
+        // 断言完成后显式取消，否则 runTest 报 UncompletedCoroutinesError
+        val registryJob = kotlinx.coroutines.SupervisorJob()
         val registry = KitMcpToolRegistry(
             client = client,
-            scope = this,
+            scope = kotlinx.coroutines.CoroutineScope(coroutineContext + registryJob),
             reconcileDebounceMs = 50L,
             onReload = { fresh -> reloaded.add(fresh.size) }
         )
-        registry.awaitInitial()
-        assertEquals(2, registry.discovered.size)
-        // 变更风暴：3 次广播在防抖窗内合并（初始 reconcile + 合并后的 1 次）
-        client.tools = listOf(descriptor("alpha", "run"))
-        client.announceChange()
-        client.announceChange()
-        client.announceChange()
-        kotlinx.coroutines.delay(200L)
-        assertEquals(1, registry.discovered.size)
-        assertTrue(reloaded.size >= 2)
-        assertTrue(reloaded.last() == 1)
+        try {
+            registry.awaitInitial()
+            assertEquals(2, registry.discovered.size)
+            // 变更风暴：3 次广播在防抖窗内合并（初始 reconcile + 合并后的 1 次）
+            client.tools = listOf(descriptor("alpha", "run"))
+            client.announceChange()
+            client.announceChange()
+            client.announceChange()
+            kotlinx.coroutines.delay(200L)
+            assertEquals(1, registry.discovered.size)
+            assertTrue(reloaded.size >= 2)
+            assertTrue(reloaded.last() == 1)
+        } finally {
+            registryJob.cancel()
+        }
     }
 
     // ═══════════════════════ 资源读取 ═══════════════════════

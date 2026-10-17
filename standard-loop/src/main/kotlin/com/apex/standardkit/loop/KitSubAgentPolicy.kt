@@ -269,6 +269,13 @@ object KitSubAgentContinuation {
         lineage: KitSubAgentSessionLineage,
         catalog: KitSubAgentCatalogPort
     ): Verdict {
+        // 画像裁决前置：primary 拒绝与未知画像拒绝在「新建 / 续接」两分支之前
+        // （primary 画像任何时候都不能作为子代理运行——不只是续接时）
+        val summary = catalog.resolve(request.agentId)
+            ?: return Verdict.Rejected("Unknown agent: ${request.agentId}")
+        if (summary.mode == KitSubAgentAgentMode.PRIMARY) {
+            return Verdict.Rejected("Agent ${request.agentId} cannot run as a subagent")
+        }
         val target = request.sessionId
         if (target == null) {
             return Verdict.Create(admissionPrompt = KitSubAgentAdmission.admissionPrompt(request.prompt))
@@ -277,11 +284,6 @@ object KitSubAgentContinuation {
             ?: return Verdict.Rejected("Subagent session not found: $target")
         if (info.parentSessionId != lineage.currentSessionId()) {
             return Verdict.Rejected("Session $target is not a child of the current session")
-        }
-        val summary = catalog.resolve(request.agentId)
-            ?: return Verdict.Rejected("Unknown agent: ${request.agentId}")
-        if (summary.mode == KitSubAgentAgentMode.PRIMARY) {
-            return Verdict.Rejected("Agent ${request.agentId} cannot run as a subagent")
         }
         val switched = info.agentId != request.agentId
         val effective = when {

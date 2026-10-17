@@ -165,11 +165,15 @@ object KitOverflowShrinkLadder {
      * 当前保留率的下一级（已在末级 → null = 诚实失败）。
      *
      * @param current 当前保留率（阶梯内任意值；未在阶梯中 → 归一到
-     *   不小于它的最小阶梯级再进位）
+     *   **不小于它的最小阶梯级**再进位；低于末级 → 视为耗尽）
      */
     fun next(current: Float): Float? {
-        val index = LADDER.indexOfFirst { it <= current }
-        val at = if (index < 0) 0 else index
+        val at = if (current >= LADDER.first()) {
+            0
+        } else {
+            LADDER.indexOfLast { it >= current }
+        }
+        if (at < 0) return null
         val nextIndex = at + 1
         if (nextIndex >= LADDER.size) return null
         return LADDER[nextIndex]

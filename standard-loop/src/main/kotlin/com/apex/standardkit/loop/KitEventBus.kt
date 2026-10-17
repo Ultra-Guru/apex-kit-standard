@@ -105,7 +105,7 @@ class KitEventBus<E : KitBusEvent>(
 fun <E> Flow<E>.debounced(windowMs: Long): Flow<E> = channelFlow {
     require(windowMs > 0) { "windowMs must be > 0" }
     val pending = kotlinx.coroutines.flow.MutableStateFlow<E?>(null)
-    launch {
+    val consumer = launch {
         pending.collectLatest { value ->
             if (value != null) {
                 delay(windowMs)
@@ -120,6 +120,9 @@ fun <E> Flow<E>.debounced(windowMs: Long): Flow<E> = channelFlow {
     kotlinx.coroutines.withTimeoutOrNull(windowMs) {
         pending.first { it == null }
     }
+    // 消费者是常驻协程（StateFlow 永不完结）——显式取消，
+    // 否则 channelFlow 等全部子协程导致下游永不收尾
+    consumer.cancel()
 }
 
 // ═══════════════════════ 事件录制 ═══════════════════════
