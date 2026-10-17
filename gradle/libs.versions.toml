@@ -1,0 +1,17 @@
+[versions]
+# 与宿主 Android-Guru-Agent 对齐（PR #362 工具链矩阵：Kotlin 2.2.21 / Gradle 8.14）
+# —— composite build 要求两侧 Kotlin/AGP 版本严格一致（AgpVersionCompatibilityRule），
+# 宿主升级后本库必须同步，否则下游复合构建直接解析失败。README 兼容矩阵同步更新。
+kotlin = "2.2.21"
+coroutines = "1.10.2"
+maven-publish = "0.30.0"
+junit = "4.13.2"
+
+[libraries]
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+junit = { module = "junit:junit", version.ref = "junit" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
