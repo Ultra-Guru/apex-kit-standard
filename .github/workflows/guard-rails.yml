@@ -84,7 +84,7 @@ jobs:
           head -40 build/api/surface.txt
 
       - name: Upload API surface snapshot
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-surface-${{ github.sha }}
           path: build/api/surface.txt
