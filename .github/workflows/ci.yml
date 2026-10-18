@@ -100,6 +100,27 @@ jobs:
           ref: ${{ steps.bkitpin.outputs.sha }}
           path: Android-Guru-Agent/apex-browser-kit
 
+      # ── 兄弟库补齐检出（宿主多库 composite build 全量接线）──────────────
+      # 宿主 81db0d48（PR #388）起 :app 同时依赖 com.apex.workspace:{core,explorer}
+      # 且坐标无远端仓库可解析 —— 缺嵌套检出则 :app:compileDebugKotlin 直接
+      # 解析失败。按宿主 workspace-kit.lock 钉住（缺锁回退 main），与宿主
+      # 自身 CI 的 pinned checkout 同源；被测库 = 本仓库 symlink，兄弟库 =
+      # 宿主锁定的已知好版本。
+      - name: Read host workspace-kit pin
+        id: wkitpin
+        run: |
+          set -euo pipefail
+          cd Android-Guru-Agent
+          PIN=$(head -n 1 gradle/workspace-kit.lock 2>/dev/null || true)
+          echo "sha=${PIN:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout apex-workspace-kit (host composite build, pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: Ultra-Guru/apex-workspace-kit
+          ref: ${{ steps.wkitpin.outputs.sha }}
+          path: Android-Guru-Agent/apex-workspace-kit
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -116,10 +137,16 @@ jobs:
 
       # 宿主 settings.gradle.kts 的嵌套兜底分支（apex-standard-kit 子目录）命中——
       # composite build 把 com.apex.standardkit:standard-loop 替换为本仓库检出。
+      # 同时校验三 kit 接线全在（browser/standard/workspace）—— 缺一即解析失败。
       - name: Link kit into host nested fallback path
         run: |
           ln -s "$GITHUB_WORKSPACE/apex-standard-kit" "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-standard-kit"
           ls -la "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-standard-kit"
+          for kit in apex-browser-kit apex-standard-kit apex-workspace-kit; do
+            grep -q "$kit" Android-Guru-Agent/settings.gradle.kts || {
+              echo "::error::宿主 settings.gradle.kts 缺少 $kit 接线"; exit 1; }
+          done
+          echo "✅ 宿主三 kit 条件 includeBuild 接线齐全（browser/standard/workspace）"
 
       - name: Compile host app module (Kotlin only, no APK packaging)
         working-directory: Android-Guru-Agent
