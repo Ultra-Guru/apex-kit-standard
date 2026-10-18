@@ -39,7 +39,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build module (compile only first for fast feedback)
         run: ./gradlew :standard-loop:assemble --no-daemon --stacktrace
@@ -133,7 +133,7 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > Android-Guru-Agent/local.properties
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # 宿主 settings.gradle.kts 的嵌套兜底分支（apex-standard-kit 子目录）命中——
       # composite build 把 com.apex.standardkit:standard-loop 替换为本仓库检出。
