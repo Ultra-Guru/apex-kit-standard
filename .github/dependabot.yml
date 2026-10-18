@@ -1,0 +1,33 @@
+# ============================================================================
+# Dependabot — dependency freshness（对齐 apex-browser-kit 的 dependabot.yml
+# —— 补齐本仓缺失的依赖新鲜度通道）。
+#
+# 本库为纯 Kotlin JVM 库（零 Android 依赖）：gradle 生态只需盯 kotlin /
+# coroutines / maven-publish / junit；github-actions 保持 workflow 常新。
+# F3 兼容列车约束（库 ≤ 宿主）由 consumer-check（宿主编译验证）把关 ——
+# 超前宿主的 bump 会被 CI 正确拦截。
+# ============================================================================
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Kotlin 工具链整体前进（stdlib / 编译器插件同版本列车）
+      kotlin:
+        patterns: ["kotlin", "org.jetbrains.kotlin*", "kotlinx"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "chore(ci)"
