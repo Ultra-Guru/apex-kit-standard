@@ -1,4 +1,4 @@
-# apex-standard-kit
+# apex-kit-standard
 
 > `com.apex.standardkit:standard-loop` — Pure-Kotlin standard thinking-loop engine for mobile coding workspaces. **Zero Android deps.**
 
@@ -147,7 +147,7 @@ val messages = KitToolSettlement.renderMessages(settled)
 
 ## 消费方式（宿主）
 
-迁移期 composite build：宿主 `settings.gradle.kts` 条件 `includeBuild`（兄弟目录 `../apex-standard-kit` 或嵌套目录），坐标 `com.apex.standardkit:standard-loop` 自动替换为本地构建。CI 由宿主流水线按 `gradle/standard-kit.lock` 锁定版本检出。
+迁移期 composite build：宿主 `settings.gradle.kts` 条件 `includeBuild`（兄弟目录 `../apex-kit-standard` 或嵌套目录），坐标 `com.apex.standardkit:standard-loop` 自动替换为本地构建。CI 由宿主流水线按 `gradle/standard-kit.lock` 锁定版本检出。
 
 ## 开发
 

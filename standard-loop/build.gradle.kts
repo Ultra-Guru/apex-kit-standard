@@ -40,7 +40,7 @@ mavenPublishing {
                 "sub-agents, context compaction, provider-safe tool surface and MCP " +
                 "guidance injection for mobile coding workspaces (zero Android deps)"
         )
-        url.set("https://github.com/Ultra-Guru/apex-standard-kit")
+        url.set("https://github.com/Ultra-Guru/apex-kit-standard")
         licenses {
             license {
                 name.set("MIT")
@@ -48,11 +48,11 @@ mavenPublishing {
             }
         }
         developers {
-            developer { id.set("AceGuru-mjh") }
+            developer { id.set("Ultra-Guru") }
         }
         scm {
-            connection.set("scm:git:git@github.com:Ultra-Guru/apex-standard-kit.git")
-            url.set("https://github.com/Ultra-Guru/apex-standard-kit")
+            connection.set("scm:git:git@github.com:Ultra-Guru/apex-kit-standard.git")
+            url.set("https://github.com/Ultra-Guru/apex-kit-standard")
         }
     }
 }

@@ -15,5 +15,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "apex-standard-kit"
+rootProject.name = "apex-kit-standard"
 include(":standard-loop")

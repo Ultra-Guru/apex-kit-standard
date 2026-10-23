@@ -1,7 +1,7 @@
 name: Release
 
 # ═════════════════════════════════════════════════════════════════════════════
-# apex-standard-kit 发布流水线（tag 触发）：
+# apex-kit-standard 发布流水线（tag 触发）：
 #   v* tag → 构建 + 单测 + publishToMavenLocal → 产物（jar / sources / POM）
 #   附到 GitHub Release（发布说明自动取 tag 间的提交清单）。
 #
@@ -106,6 +106,6 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "${TAG}" \
-            --title "apex-standard-kit ${TAG}" \
+            --title "apex-kit-standard ${TAG}" \
             --notes-file build/release/notes.md \
             build/release/standard-loop-*.jar build/release/standard-loop-*.pom

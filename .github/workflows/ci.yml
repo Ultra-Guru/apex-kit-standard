@@ -1,6 +1,6 @@
 name: CI
 
-# apex-standard-kit CI —— 两道防线：
+# apex-kit-standard CI —— 两道防线：
 #   1. build-test：库自身编译 + 单测 + publishToMavenLocal 可发布性
 #   2. consumer-check：跨仓库验证宿主 Android-Guru-Agent 仍能编译（防下游崩，
 #      跨仓库 CI 漂移的解法）—— 库的每次 PR 都对宿主 :app:compileDebugKotlin
@@ -76,7 +76,7 @@ jobs:
       - name: Checkout this repo (sibling layout)
         uses: actions/checkout@v7
         with:
-          path: apex-standard-kit
+          path: apex-kit-standard
 
       - name: Checkout host repo (sibling layout)
         uses: actions/checkout@v7
@@ -135,18 +135,33 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      # 宿主 settings.gradle.kts 的嵌套兜底分支（apex-standard-kit 子目录）命中——
-      # composite build 把 com.apex.standardkit:standard-loop 替换为本仓库检出。
-      # 同时校验三 kit 接线全在（browser/standard/workspace）—— 缺一即解析失败。
+      # 宿主 settings.gradle.kts 的嵌套兜底分支命中——composite build 把
+      # com.apex.standardkit:standard-loop 替换为本仓库检出。
+      # 改名过渡布局（apex-*(x)-kit → apex-kit-*）：新名检出 + 旧名兄弟/嵌套
+      # 双别名，任一时刻宿主新旧探针恒命中（宿主侧联动 PR 合并前后均绿）。
+      # 兄弟库 = 宿主锁定的已知好版本（嵌套检出旧名 + 新名别名，同过渡语义）。
       - name: Link kit into host nested fallback path
         run: |
-          ln -s "$GITHUB_WORKSPACE/apex-standard-kit" "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-standard-kit"
-          ls -la "$GITHUB_WORKSPACE/Android-Guru-Agent/apex-standard-kit"
-          for kit in apex-browser-kit apex-standard-kit apex-workspace-kit; do
-            grep -q "$kit" Android-Guru-Agent/settings.gradle.kts || {
-              echo "::error::宿主 settings.gradle.kts 缺少 $kit 接线"; exit 1; }
+          set -euo pipefail
+          WS="$GITHUB_WORKSPACE"
+          # 本库：新名检出（apex-kit-standard）+ 旧名兄弟别名（宿主 ../apex-standard-kit 探针）
+          ln -s "$WS/apex-kit-standard" "$WS/apex-standard-kit"
+          # 嵌套兜底：新旧双名别名（宿主嵌套探针，改名前后均命中）
+          ln -s "$WS/apex-kit-standard" "$WS/Android-Guru-Agent/apex-standard-kit"
+          ln -s "$WS/apex-kit-standard" "$WS/Android-Guru-Agent/apex-kit-standard"
+          ls -la "$WS/Android-Guru-Agent/" | grep -E "apex-(kit-)?(standard)"
+          # 兄弟库新名别名（嵌套探针，宿主联动 PR 合并后命中；旧名仍为真目录）
+          ln -s "$WS/Android-Guru-Agent/apex-browser-kit" "$WS/Android-Guru-Agent/apex-kit-browser"
+          ln -s "$WS/Android-Guru-Agent/apex-workspace-kit" "$WS/Android-Guru-Agent/apex-kit-workspace"
+          # 接线校验：新旧任一形态在即算接通（缺一即解析失败）
+          for kit in apex-browser-kit:apex-kit-browser \
+                     apex-standard-kit:apex-kit-standard \
+                     apex-workspace-kit:apex-kit-workspace; do
+            OLD="${kit%%:*}"; NEW="${kit##*:}"
+            grep -qE "$OLD|$NEW" Android-Guru-Agent/settings.gradle.kts || {
+              echo "::error::宿主 settings.gradle.kts 缺少 $OLD / $NEW 接线"; exit 1; }
           done
-          echo "✅ 宿主三 kit 条件 includeBuild 接线齐全（browser/standard/workspace）"
+          echo "✅ 宿主三 kit 条件 includeBuild 接线齐全（browser/standard/workspace，新旧名任一形态）"
 
       - name: Compile host app module (Kotlin only, no APK packaging)
         working-directory: Android-Guru-Agent
