@@ -35,26 +35,29 @@ internal class KitReadGuard(
 
     /**
      * 执行前校验：未读先编 → 拒绝文案；放行返回 null。
+     *
+     * 工具 id 匹配经 [KitToolIdForms] 形态归一——PascalCase 注册表
+     * （`CodeEdit` / `CodeWrite`）与旧代 snake_case 同权受守卫约束。
      */
     fun check(registryName: String, arguments: String): String? {
-        if (registryName !in GUARDED_TOOLS) return null
+        if (GUARDED_TOOLS.none { KitToolIdForms.sameId(registryName, it) }) return null
         val rawPath = extractPath(arguments) ?: return null
         if (trackedPathKey(rawPath) in readFiles) return null
-        if (registryName == "code_write") {
+        if (KitToolIdForms.sameId(registryName, "code_write")) {
             // 新建免检：能解析到宿主文件且存在 → 必须先读；不存在 → 放行
             val hostFile = resolveHostFile(rawPath)
             if (hostFile == null || !hostFile.isFile) return null
         }
         return "File has not been read in this session yet: $rawPath. Read it first " +
             "with the read tool, then retry with fresh content. If you intend to " +
-            "create a NEW file, use code_write instead."
+            "create a NEW file, use the write tool instead."
     }
 
     /**
-     * 成功后登记读状态（code_read / code_edit / code_write）。
+     * 成功后登记读状态（code_read / code_edit / code_write，形态归一命中）。
      */
     fun record(registryName: String, arguments: String) {
-        if (registryName !in RECORDING_TOOLS) return
+        if (RECORDING_TOOLS.none { KitToolIdForms.sameId(registryName, it) }) return
         extractPath(arguments)?.let { readFiles.add(trackedPathKey(it)) }
     }
 
@@ -84,10 +87,10 @@ internal class KitReadGuard(
         /** 沙箱会话中工作区统一挂载点（与宿主工具口径一致）。 */
         private const val GUEST_PATH = "/workspace"
 
-        /** 受守卫约束的工具集（编辑 / 覆盖写）。 */
+        /** 受守卫约束的工具集（编辑 / 覆盖写；形态归一：`CodeEdit` 同权命中）。 */
         private val GUARDED_TOOLS = setOf("code_edit", "code_write")
 
-        /** 成功后登记读状态的工具集（读过 / 写过 = 内容已知）。 */
+        /** 成功后登记读状态的工具集（读过 / 写过 = 内容已知；形态归一命中）。 */
         private val RECORDING_TOOLS = setOf("code_read", "code_edit", "code_write")
     }
 }

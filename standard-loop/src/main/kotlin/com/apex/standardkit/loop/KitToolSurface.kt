@@ -7,7 +7,9 @@ package com.apex.standardkit.loop
  *
  * 1. **画像 → 工具面**：按 [KitAgentDefinition.toolAllowlist] 前缀集过滤
  *    注册表（`""` = 通配全量；`code_git_` = 前缀；`mcp__` 动态注册的
- *    MCP 一等工具天然命中），叠加强制函数集收窄；
+ *    MCP 一等工具天然命中），叠加强制函数集收窄；所有前缀 / 精确 id
+ *    匹配经 [KitToolIdForms] 形态归一——旧代 snake_case（`code_read`）
+ *    与新代 PascalCase（`CodeRead`）注册表同权支持；
  * 2. **别名归一**：模型可能输出业界惯用名（read/write/edit/bash/grep/
  *    glob/todo/task…），[resolveRegistryId] 归一到注册表 id；未知名归一
  *    失败时 [suggestToolIds] 给出相近候选；
@@ -30,7 +32,8 @@ object KitToolSurface {
     const val MAX_TOOLS = 48
 
     /**
-     * 业界惯用名 → 注册表 id 归一表。
+     * 业界惯用名 → 注册表 id 归一表（目标 id 为旧代 snake_case 形态；
+     * [resolveRegistryId] 携注册表快照时自动折算到现役形态）。
      */
     private val ALIAS_TO_REGISTRY: Map<String, String> = mapOf(
         "read" to "code_read",
@@ -60,7 +63,8 @@ object KitToolSurface {
         "dispatch" to "task"
     )
 
-    /** 编码相关前缀优先序（截断时的稳定排序依据）。 */
+    /** 编码相关前缀优先序（截断时的稳定排序依据；经 [KitToolIdForms.matchesPrefix]
+     *  形态归一匹配——PascalCase 注册表同权命中）。 */
     private val PRIORITY_PREFIXES = listOf(
         "code_", "shell_execute", "terminal.", "code_git_", "web_", "http_",
         "skill_", "mcp__"
@@ -84,18 +88,35 @@ object KitToolSurface {
      * 仍未命中原样返回。
      */
     fun resolveRegistryId(name: String): String =
-        ALIAS_TO_REGISTRY[name]
-            ?: NORMALIZED_ALIAS_TO_REGISTRY[normalizeKey(name)]
-            ?: name
+        resolveRegistryId(name, emptyList())
 
     /**
-     * 给未知工具名找相近候选（前 3 个，保持 available 原序）。
+     * 别名归一（携带注册表快照）：归一结果折算到注册表现役形态。
+     *
+     * 别名表的目标 id 是旧代 snake_case 形态；注册表可能是新代
+     * PascalCase（`CodeRead`）——不带快照时返回表内原值（旧行为），
+     * 带快照时优先返回快照里真实存在的形态，保证归一结果可被
+     * `knownToolNames` 精确命中（否则模型调 `bash` 会被误判未知工具）。
+     */
+    fun resolveRegistryId(name: String, availableIds: Collection<String>): String {
+        val direct = ALIAS_TO_REGISTRY[name]
+            ?: NORMALIZED_ALIAS_TO_REGISTRY[normalizeKey(name)]
+            ?: name
+        if (availableIds.isEmpty()) return direct
+        availableIds.firstOrNull { KitToolIdForms.sameId(it, direct) }?.let { return it }
+        availableIds.firstOrNull { KitToolIdForms.sameId(it, name) }?.let { return it }
+        return direct
+    }
+
+    /**
+     * 给未知工具名找相近候选（前 3 个，保持 available 原序；比较经
+     * [KitToolIdForms.key] 形态归一——`CodeRead` 与 `code_read` 互为候选）。
      */
     fun suggestToolIds(attempted: String, available: List<String>): List<String> {
-        val target = normalizeKey(attempted).removePrefix("code_")
+        val target = KitToolIdForms.key(attempted).removePrefix("code")
         if (target.isEmpty()) return emptyList()
         return available.filter { candidate ->
-            val normalized = normalizeKey(candidate).removePrefix("code_")
+            val normalized = KitToolIdForms.key(candidate).removePrefix("code")
             normalized.isNotEmpty() && (
                 levenshteinWithin(target, normalized, limit = 2) ||
                     normalized.startsWith(target) ||
@@ -103,6 +124,26 @@ object KitToolSurface {
                     target.startsWith(normalized)
                 )
         }.take(3)
+    }
+
+    /**
+     * 工具面是否包含 shell 执行类工具（纪律提示词开关；形态归一：
+     * `ShellExecute` / `shell_execute` / `TerminalExec` / `bash` 全命中）。
+     */
+    fun planHasShell(planToolIds: List<String>): Boolean = planToolIds.any {
+        KitToolIdForms.matchesPrefix(it, "shell_") ||
+            KitToolIdForms.matchesPrefix(it, "terminal") ||
+            KitToolIdForms.sameId(it, "bash")
+    }
+
+    /** 工具面是否包含写文件类工具（`CodeWrite` / `code_write` / `write`）。 */
+    fun planHasWrite(planToolIds: List<String>): Boolean = planToolIds.any {
+        KitToolIdForms.sameId(it, "code_write") || KitToolIdForms.sameId(it, "write")
+    }
+
+    /** 工具面是否包含编辑类工具（`CodeEdit` / `code_edit` / `edit`）。 */
+    fun planHasEdit(planToolIds: List<String>): Boolean = planToolIds.any {
+        KitToolIdForms.sameId(it, "code_edit") || KitToolIdForms.sameId(it, "edit")
     }
 
     /** 有界编辑距离（超过 limit 提前剪枝）。 */
@@ -143,6 +184,10 @@ object KitToolSurface {
     /**
      * 请求工具面计划（provider-safe）。
      *
+     * 所有 id 匹配（强制集 / 白名单前缀 / 优先序前缀）均经 [KitToolIdForms]
+     * 形态归一——旧代 snake_case 与新代 PascalCase 注册表同权支持，防止
+     * 前缀失配导致截断退化为字典序（编码 / shell / 终端族被整体裁掉）。
+     *
      * @param definition 画像
      * @param registryDefinitions 注册表快照
      * @param forcedToolIds 强制函数集（非空时只暴露选中工具 + task）
@@ -157,14 +202,16 @@ object KitToolSurface {
         includeSyntheticTools: Boolean = definition.includeSyntheticTools
     ): KitToolPlan {
         val all = registryDefinitions
-        val forced = forcedToolIds.mapNotNull { id -> all.firstOrNull { it.name == id } }
+        val forced = forcedToolIds.mapNotNull { id ->
+            all.firstOrNull { KitToolIdForms.sameId(it.name, id) }
+        }
 
         val base: List<KitToolDefinition> = when {
             forced.isNotEmpty() -> forced
             exposeAll || definition.toolAllowlist.any { it.isEmpty() } -> all
             else -> all.filter { def ->
                 definition.toolAllowlist.any { prefix ->
-                    prefix.isEmpty() || def.name.startsWith(prefix)
+                    KitToolIdForms.matchesPrefix(def.name, prefix)
                 }
             }
         }
@@ -172,7 +219,7 @@ object KitToolSurface {
         val curated = (if (forced.isNotEmpty()) base else base.sortedWith(
             compareByDescending<KitToolDefinition> { def ->
                 val id = def.name
-                PRIORITY_PREFIXES.indexOfFirst { id.startsWith(it) }
+                PRIORITY_PREFIXES.indexOfFirst { KitToolIdForms.matchesPrefix(id, it) }
                     .let { if (it < 0) Int.MIN_VALUE else -it }
             }.thenBy { it.name }
         )).take(MAX_TOOLS)
@@ -217,9 +264,23 @@ object KitToolSurface {
             appendLine("  " + chunk.joinToString(", "))
         }
         appendLine()
-        appendLine("Common aliases are auto-resolved (read→code_read, write→code_write,")
-        appendLine("edit→code_edit, bash→shell_execute, grep→code_grep, glob→code_glob,")
-        appendLine("todo→code_todo, check→code_check) — but prefer the exact names above.")
+        // 别名指引按注册表现役形态动态渲染（v5 PascalCase 注册表显示
+        // bash→ShellExecute，旧代注册表显示 bash→shell_execute）。
+        val surfaceIds = planToolIds.toSet()
+        val aliasPairs = GUIDE_ALIASES.mapNotNull { alias ->
+            resolveRegistryId(alias, planToolIds)
+                .takeIf { resolved -> resolved in surfaceIds || resolved == SYNTHETIC_TASK_ID }
+                ?.let { resolved -> "$alias→$resolved" }
+        }
+        if (aliasPairs.isNotEmpty()) {
+            appendLine(
+                "Common aliases are auto-resolved (" + aliasPairs.joinToString(", ") +
+                    ") — but prefer the exact names above."
+            )
+        } else {
+            appendLine("Common aliases are auto-resolved (read, write, edit, bash, grep,")
+            appendLine("glob, todo, check) — but prefer the exact names above.")
+        }
         // ── MCP 工具指引（面里有 MCP 一等工具时给命名约定提示）──
         val mcpIds = displayIds.filter { it.startsWith("mcp__") }
         if (mcpIds.isNotEmpty()) {
@@ -314,9 +375,14 @@ object KitToolSurface {
         """.trimIndent()
     )
 
-    /** 工具面里是否包含 todo 工具（决定提示词是否拼 Todo 指引段）。 */
+    /** 工具面里是否包含 todo 工具（决定提示词是否拼 Todo 指引段；
+     *  形态归一：`CodeTodo` / `code_todo` / `todo` 全命中）。 */
     fun planHasTodo(planToolIds: List<String>): Boolean =
-        planToolIds.any { it == "code_todo" || it == "todo" }
+        planToolIds.any { KitToolIdForms.sameId(it, "code_todo") || KitToolIdForms.sameId(it, "todo") }
+
+    /** 指引段渲染的代表性别名（→ 注册表现役形态动态折算）。 */
+    private val GUIDE_ALIASES =
+        listOf("read", "write", "edit", "bash", "grep", "glob", "todo", "check")
 }
 
 /**

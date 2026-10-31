@@ -16,10 +16,12 @@ package com.apex.standardkit.loop
  *
  * ## 工具面前缀白名单语义
  *
- * [LoopToolSurface] 按前缀集过滤注册表：
+ * [KitToolSurface] 按前缀集过滤注册表（匹配经 [KitToolIdForms] 形态归一
+ * ——白名单写旧代 snake_case，注册表是新代 PascalCase 时同权命中）：
  * - `""`（空串）= 通配一切（构建者/通用）；
- * - `code_read` = 精确 id；
- * - `code_git_` / `mcp__` = 前缀（MCP 一等工具全部放行给构建者/通用/调研）。
+ * - `code_read` = 精确 id（同时命中 `CodeRead`）；
+ * - `code_git_` / `skill_` = 家族前缀（同时命中 `CodeGitStatus` / `SkillList`）；
+ * - `mcp__` = 命名空间前缀（仅原样匹配动态注册的 MCP 一等工具）。
  */
 enum class KitAgentRole {
     /** 主代理（与用户对话的那个循环）。 */
@@ -95,6 +97,7 @@ object KitAgentCatalog {
             "以最小改动闭环交付，从不留 TODO 占位。",
         toolAllowlist = setOf(
             "", // 通配：code_* / shell_execute / git / web / skill / mcp__* 全量
+            // （前缀匹配形态归一——PascalCase 注册表 CodeRead/ShellExecute/… 同权）
         ),
         defaultMaxTurns = 32,
         subagentMaxTurns = 12
