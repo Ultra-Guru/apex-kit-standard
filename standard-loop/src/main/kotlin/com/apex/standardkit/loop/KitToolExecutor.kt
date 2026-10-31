@@ -126,19 +126,22 @@ object KitToolBatchPlanner {
      *
      * 安全面：code_read / code_grep / code_glob / code_todo / code_check /
      * task（子代理派发）/ mcp__ 前缀 / skill_ 前缀 / web_ 与 http_ 前缀。
+     * 匹配经 [KitToolIdForms] 形态归一——PascalCase 注册表
+     * （`CodeRead` / `SkillList` / `WebSearch`…）同权命中。
      */
     fun defaultParallelSafe(invocation: KitToolInvocation): Boolean {
         val name = invocation.toolName
         return when {
-            name.startsWith("mcp__") -> true
-            name.startsWith("skill_") -> true
-            name.startsWith("web_") || name.startsWith("http_") -> true
-            name == "task" -> true
-            name.startsWith("code_read") ||
-                name.startsWith("code_grep") ||
-                name.startsWith("code_glob") ||
-                name.startsWith("code_todo") ||
-                name.startsWith("code_check") -> true
+            KitToolIdForms.matchesPrefix(name, "mcp__") -> true
+            KitToolIdForms.matchesPrefix(name, "skill_") -> true
+            KitToolIdForms.matchesPrefix(name, "web_") ||
+                KitToolIdForms.matchesPrefix(name, "http_") -> true
+            KitToolIdForms.sameId(name, "task") -> true
+            KitToolIdForms.matchesPrefix(name, "code_read") ||
+                KitToolIdForms.matchesPrefix(name, "code_grep") ||
+                KitToolIdForms.matchesPrefix(name, "code_glob") ||
+                KitToolIdForms.matchesPrefix(name, "code_todo") ||
+                KitToolIdForms.matchesPrefix(name, "code_check") -> true
             else -> false
         }
     }

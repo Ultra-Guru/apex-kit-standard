@@ -290,7 +290,8 @@ class KitPermissionEngine(
 
     companion object {
 
-        /** 只读工具 id 前缀表（静态——不依赖注册表实例）。 */
+        /** 只读工具 id 前缀表（静态——不依赖注册表实例；
+         *  匹配经形态归一：`CodeRead` / `code_read` 同权命中）。 */
         private val READONLY_EXACT = setOf(
             "code_read", "code_grep", "code_glob", "code_check",
             "code_git_status", "code_git_diff", "code_git_log",
@@ -298,40 +299,45 @@ class KitPermissionEngine(
             "task", "code_todo"
         )
 
-        private val READONLY_PREFIXES = listOf("mcp__", "skill_")
+        /** 只读家族前缀（形态归一匹配：`SkillList` 命中 `skill_`）。 */
+        private val READONLY_PREFIXES = listOf("skill_", "mcp__")
 
-        /** shell 执行类工具 id 集（命令级规则的作用域）。 */
+        /** shell 执行类工具 id 集（命令级规则的作用域；形态归一命中）。 */
         private val SHELL_TOOLS = setOf("shell_execute", "terminal.exec", "bash")
 
-        /** 编辑/写类工具 id 集（ACCEPT_EDITS 放行面）。 */
+        /** 编辑/写类工具 id 集（ACCEPT_EDITS 放行面；形态归一命中）。 */
         private val EDIT_TOOLS = setOf(
             "code_edit", "code_write", "code_git_commit", "code_git_branch"
         )
 
-        /** 是否只读工具（无环境副作用）。 */
+        /** 是否只读工具（无环境副作用；形态归一：`CodeRead` / `code_read` 同权，
+         *  `mcp__` 命名空间原样匹配——`McpCall` 管理工具不被误吸入）。 */
         fun isReadOnlyTool(toolId: String): Boolean =
-            toolId in READONLY_EXACT || READONLY_PREFIXES.any { toolId.startsWith(it) }
+            READONLY_EXACT.any { KitToolIdForms.sameId(toolId, it) } ||
+                READONLY_PREFIXES.any { KitToolIdForms.matchesPrefix(toolId, it) }
 
-        /** 是否 shell 执行类工具。 */
-        fun isShellTool(toolId: String): Boolean = toolId in SHELL_TOOLS
+        /** 是否 shell 执行类工具（形态归一：`ShellExecute` / `TerminalExec` 同权）。 */
+        fun isShellTool(toolId: String): Boolean =
+            SHELL_TOOLS.any { KitToolIdForms.sameId(toolId, it) }
 
-        /** 是否编辑/写类工具。 */
-        fun isEditTool(toolId: String): Boolean = toolId in EDIT_TOOLS
+        /** 是否编辑/写类工具（形态归一：`CodeEdit` / `CodeWrite` 同权）。 */
+        fun isEditTool(toolId: String): Boolean =
+            EDIT_TOOLS.any { KitToolIdForms.sameId(toolId, it) }
 
         /**
-         * 工具 id 规则匹配：
+         * 工具 id 规则匹配（形态归一：规则与 id 均接受新旧两代形态）：
          * - 单独 `*` 匹配一切；
          * - 尾缀 `*` → 前缀匹配（`mcp__github__*` 封禁整台服务器）；
-         * - 其余精确相等。
+         * - 其余精确相等（`code_write` 规则可命中 `CodeWrite` 工具）。
          */
         fun matches(pattern: String, toolId: String): Boolean {
             if (pattern.isBlank()) return false
             if (pattern == "*") return true
             return if (pattern.endsWith("*")) {
                 val prefix = pattern.dropLast(1)
-                prefix.isNotEmpty() && toolId.startsWith(prefix)
+                prefix.isNotEmpty() && KitToolIdForms.matchesPrefix(toolId, prefix)
             } else {
-                pattern == toolId
+                KitToolIdForms.sameId(pattern, toolId)
             }
         }
 

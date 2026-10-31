@@ -640,7 +640,7 @@ class AgentLoopEngine(
 
         val prepared = calls.map { call ->
             val registryName = providerNameToId[call.name]
-                ?: KitToolSurface.resolveRegistryId(call.name)
+                ?: KitToolSurface.resolveRegistryId(call.name, knownToolNames)
             val callId = call.id.ifBlank {
                 KitIds.toolCallId(if (subAgentMode) "sub_" else "std_")
             }
@@ -649,7 +649,7 @@ class AgentLoopEngine(
             report.toolCalls++
 
             val knownTool = KitToolSurface.isSyntheticTaskTool(registryName) ||
-                registryName in knownToolNames
+                knownToolNames.any { KitToolIdForms.sameId(it, registryName) }
             val readGuardBlock = if (knownTool) readGuard.check(registryName, call.arguments) else null
             val blocked: String? = when {
                 !knownTool -> KitPrompts.unknownToolResult(
@@ -876,7 +876,7 @@ class AgentLoopEngine(
                 return "task 工具不可用（子代理不能再派发子代理）" to false
             }
             if (extractJsonString(arguments, "subagent_type") == "custom") {
-                return ("custom 子代理类型当前思考逻辑线暂不支持，请切深潜线（code_task）" +
+                return ("custom 子代理类型当前思考逻辑线暂不支持，请切深潜线（CodeTask）" +
                     "或使用内置类型（explore/research/general/reviewer）") to false
             }
             val request = parseSubAgentRequest(arguments)
@@ -1214,11 +1214,9 @@ class AgentLoopEngine(
             )
         )
         val discipline = KitPrompts.toolDiscipline(
-            hasShell = planToolIds.any {
-                it.startsWith("shell_") || it.startsWith("terminal") || it == "bash"
-            },
-            hasWrite = planToolIds.any { it == "code_write" || it == "write" },
-            hasEdit = planToolIds.any { it == "code_edit" || it == "edit" }
+            hasShell = KitToolSurface.planHasShell(planToolIds),
+            hasWrite = KitToolSurface.planHasWrite(planToolIds),
+            hasEdit = KitToolSurface.planHasEdit(planToolIds)
         )
         if (discipline.isNotBlank()) {
             appendLine()
