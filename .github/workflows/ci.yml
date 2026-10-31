@@ -121,6 +121,58 @@ jobs:
           ref: ${{ steps.wkitpin.outputs.sha }}
           path: Android-Guru-Agent/apex-workspace-kit
 
+      # ── 兄弟库补齐检出（续）：memory / loom / courier ────────────────────
+      # 宿主后来接入的三个 kit（:platform:memory-host → com.apex.memkit:
+      # {memory-core,memory-graph-ui}；:core:code-engine → com.apex.loomkit:
+      # loom-weave + com.apex.courierkit:courier-dispatch）坐标均无远端仓库
+      # 可解析 —— 缺嵌套检出则 :app:compileDebugKotlin 直接解析失败（与上方
+      # workspace-kit 同款缺口，同步补齐）。均按宿主对应 *-kit.lock 钉住
+      # （缺锁回退 main），检出路径 = 宿主嵌套探针名（apex-kit-*，无需别名）。
+      - name: Read host memory-kit pin
+        id: memkitpin
+        run: |
+          set -euo pipefail
+          cd Android-Guru-Agent
+          PIN=$(head -n 1 gradle/memory-kit.lock 2>/dev/null || true)
+          echo "sha=${PIN:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout apex-kit-memory (host composite build, pinned)
+        uses: actions/checkout@v7
+        with:
+          repository: Ultra-Guru/apex-kit-memory
+          ref: ${{ steps.memkitpin.outputs.sha }}
+          path: Android-Guru-Agent/apex-kit-memory
+
+      - name: Read host loom-kit pin
+        id: lkitpin
+        run: |
+          set -euo pipefail
+          cd Android-Guru-Agent
+          PIN=$(head -n 1 gradle/loom-kit.lock 2>/dev/null || true)
+          echo "sha=${PIN:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout apex-kit-loom (host composite build, pinned)
+        uses: actions/checkout@v7
+        with:
+          repository: Ultra-Guru/apex-kit-loom
+          ref: ${{ steps.lkitpin.outputs.sha }}
+          path: Android-Guru-Agent/apex-kit-loom
+
+      - name: Read host courier-kit pin
+        id: ckitpin
+        run: |
+          set -euo pipefail
+          cd Android-Guru-Agent
+          PIN=$(head -n 1 gradle/courier-kit.lock 2>/dev/null || true)
+          echo "sha=${PIN:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout apex-kit-courier (host composite build, pinned)
+        uses: actions/checkout@v7
+        with:
+          repository: Ultra-Guru/apex-kit-courier
+          ref: ${{ steps.ckitpin.outputs.sha }}
+          path: Android-Guru-Agent/apex-kit-courier
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
@@ -156,12 +208,15 @@ jobs:
           # 接线校验：新旧任一形态在即算接通（缺一即解析失败）
           for kit in apex-browser-kit:apex-kit-browser \
                      apex-standard-kit:apex-kit-standard \
-                     apex-workspace-kit:apex-kit-workspace; do
+                     apex-workspace-kit:apex-kit-workspace \
+                     apex-kit-memory:apex-kit-memory \
+                     apex-kit-loom:apex-kit-loom \
+                     apex-kit-courier:apex-kit-courier; do
             OLD="${kit%%:*}"; NEW="${kit##*:}"
             grep -qE "$OLD|$NEW" Android-Guru-Agent/settings.gradle.kts || {
               echo "::error::宿主 settings.gradle.kts 缺少 $OLD / $NEW 接线"; exit 1; }
           done
-          echo "✅ 宿主三 kit 条件 includeBuild 接线齐全（browser/standard/workspace，新旧名任一形态）"
+          echo "✅ 宿主六 kit 条件 includeBuild 接线齐全（browser/standard/workspace/memory/loom/courier，新旧名任一形态）"
 
       - name: Compile host app module (Kotlin only, no APK packaging)
         working-directory: Android-Guru-Agent
